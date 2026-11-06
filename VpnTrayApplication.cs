@@ -144,64 +144,26 @@ namespace GVPN
                     // If VPN was connected but now disconnected
                     if (wasConnected && !isConnected)
                     {
-                        logger.Log("VPN disconnected!");
+                        logger.Log("VPN DISCONNECTED - wasConnected: true, isConnected: false");
                         
                         // If kill switch is enabled, block all traffic
                         if (killSwitchEnabled)
                         {
-                            logger.Log("Kill switch is ENABLED - blocking all traffic to prevent leaks");
+                            logger.Log("Kill switch enabled - activating kill switch (no popup)");
                             vpnManager.EnableKillSwitch();
-                            this.Invoke((MethodInvoker)delegate
-                            {
-                                MessageBox.Show(
-                                    "VPN DISCONNECTED!\n\nKill Switch activated - all traffic blocked.",
-                                    "ALERT: Kill Switch Active",
-                                    MessageBoxButtons.OK,
-                                    MessageBoxIcon.Warning);
-                                UpdateTrayIcon();
-                            });
                         }
-                        // If kill switch is disabled, try to reconnect with failover
+                        // If kill switch is disabled, try to reconnect immediately
                         else
                         {
-                            logger.Log("Attempting automatic reconnection with failover...");
-                            
-                            // Get all available servers
-                            List<VpnServer> servers = vpnManager.GetAllVpnServers();
-                            
-                            if (servers.Count > 0)
-                            {
-                                // Try to connect with failover (tries up to 5 best servers)
-                                if (vpnManager.ConnectVpnWithFailover(servers, 5))
-                                {
-                                    isConnected = true;
-                                    logger.Log("Auto-reconnection successful!");
-                                }
-                                else
-                                {
-                                    logger.Log("Auto-reconnection failed - will retry next check");
-                                }
-                            }
-                            else
-                            {
-                                logger.Log("Could not fetch VPN servers for failover");
-                            }
+                            logger.Log("Kill switch disabled - starting failover reconnection");
+                            ReconnectWithFailover();
                         }
                     }
-                    // If VPN is still disconnected and kill switch is disabled, keep trying failover
-                    else if (!isConnected && !killSwitchEnabled && !wasConnected)
+                    // If VPN is still disconnected and kill switch is disabled, keep trying
+                    else if (!isConnected && !killSwitchEnabled)
                     {
-                        logger.Log("VPN still disconnected - retrying reconnection with failover");
-                        List<VpnServer> servers = vpnManager.GetAllVpnServers();
-                        
-                        if (servers.Count > 0)
-                        {
-                            if (vpnManager.ConnectVpnWithFailover(servers, 5))
-                            {
-                                isConnected = true;
-                                logger.Log("Auto-reconnection successful!");
-                            }
-                        }
+                        logger.Log("VPN still disconnected - retrying reconnection");
+                        ReconnectWithFailover();
                     }
 
                     this.Invoke((MethodInvoker)delegate
@@ -216,6 +178,37 @@ namespace GVPN
                     logger.Log("Monitor error: " + ex.Message);
                     Thread.Sleep(5000);
                 }
+            }
+        }
+
+        private void ReconnectWithFailover()
+        {
+            try
+            {
+                List<VpnServer> servers = vpnManager.GetAllVpnServers();
+                logger.Log("Fetched " + servers.Count + " servers for failover");
+                
+                if (servers.Count > 0)
+                {
+                    logger.Log("Starting failover - trying up to 5 servers");
+                    if (vpnManager.ConnectVpnWithFailover(servers, 5))
+                    {
+                        isConnected = true;
+                        logger.Log("Failover SUCCESS - reconnected!");
+                    }
+                    else
+                    {
+                        logger.Log("Failover FAILED - will retry on next check");
+                    }
+                }
+                else
+                {
+                    logger.Log("No servers available for failover");
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Log("Failover error: " + ex.Message);
             }
         }
 

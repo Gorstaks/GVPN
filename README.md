@@ -129,8 +129,72 @@ Application logs are saved to `vpn.log` in the working directory with entries li
 
 - Requires a pre-configured RAS VPN connection named "MyVPN"
 - Windows only (uses `rasdial.exe` for VPN operations)
-- Kill switch just disconnects and exits; doesn't block all traffic
+- Kill switch just disconnects and exits; doesn't block all traffic permanently
 - VPN credentials hardcoded in source (for trusted environments only)
+
+## Legal Disclaimer
+
+**IMPORTANT - READ BEFORE USE**
+
+GVPN is provided as-is for educational and personal use only. By using this software, you agree to the following:
+
+### Usage Restrictions
+- Use GVPN **only on systems you own or have explicit permission to use**
+- Do **NOT** use GVPN to circumvent security measures, firewalls, or access controls that you are not authorized to bypass
+- Do **NOT** use GVPN for any illegal activities, including but not limited to:
+  - Unauthorized access to computer systems
+  - Copyright infringement or piracy
+  - Fraud, hacking, or cybercrime
+  - Evading law enforcement
+  - Harassment or attacks on others
+  - Any activity that violates local, state, or international laws
+
+### No Warranty
+- This software is provided **without any warranty, express or implied**
+- The author is **not responsible** for:
+  - Data loss or corruption
+  - Network issues or connection problems
+  - VPN disconnections or reconnection failures
+  - Any damage caused by use or misuse of this software
+  - Any liability arising from your use of this software
+
+### Liability
+- **You are solely responsible** for your use of GVPN
+- The author **assumes no liability** for:
+  - Any loss of privacy or exposure of data
+  - Regulatory violations or legal consequences
+  - System damage or downtime
+  - Third-party claims
+
+### VPN & Privacy
+- Using a VPN does **not guarantee anonymity or privacy**
+- VPN providers may log your activity (check their privacy policy)
+- Your ISP may still see that you're using a VPN
+- Kill switch can fail; never rely on it as your only protection
+- **No tool can provide 100% privacy** - use responsibly and legally
+
+### Age Restriction
+- You must be **at least 18 years old** (or the legal age of majority in your jurisdiction) to use this software
+
+### Compliance
+- **You are responsible for complying** with:
+  - All local, state, and national laws
+  - Your ISP's terms of service
+  - Your employer's or organization's policies
+  - The laws of countries whose services you access
+  - VPN provider's terms of service
+
+### No Support for Illegal Activity
+- The author **does not condone, endorse, or support** any illegal use
+- Misuse of this software may result in:
+  - Criminal prosecution
+  - Civil liability
+  - Permanent bans from services
+  - Legal consequences
+
+**By downloading and using GVPN, you acknowledge that you have read, understood, and agree to these terms.**
+
+If you do not agree with any of these terms, **do not use this software**.
 
 ## Troubleshooting
 

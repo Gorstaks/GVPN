@@ -106,21 +106,22 @@ namespace GVPN
 
                 using (var process = Process.Start(psi))
                 {
-                    if (!process.WaitForExit(10000))
+                    // Reduced timeout from 10s to 5s for faster failover
+                    if (!process.WaitForExit(5000))
                     {
                         process.Kill();
-                        logger.Log("VPN connection timed out");
+                        logger.Log("Connection attempt timed out after 5s");
                         return false;
                     }
 
                     if (process.ExitCode != 0)
                     {
                         string error = process.StandardError.ReadToEnd();
-                        logger.Log("VPN connection failed: " + error);
+                        logger.Log("Connection failed (exit " + process.ExitCode + "): " + error);
                         return false;
                     }
 
-                    logger.Log("VPN connected to " + host);
+                    logger.Log("Connected to " + host);
                     return true;
                 }
             }
@@ -171,7 +172,7 @@ namespace GVPN
                 }
 
                 logger.Log("Failed to connect to " + server.Host + ", trying next server...");
-                System.Threading.Thread.Sleep(2000);
+                System.Threading.Thread.Sleep(1000);
             }
 
             logger.Log("All " + maxServerAttempts + " failover attempts failed");
