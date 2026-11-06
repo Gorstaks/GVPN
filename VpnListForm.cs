@@ -31,7 +31,7 @@ namespace GVPN
         private void SetupForm()
         {
             this.Text = "GVPN - Available VPN Servers";
-            this.Size = new Size(700, 500);
+            this.Size = new Size(800, 600);
             this.StartPosition = FormStartPosition.CenterScreen;
             this.Icon = CreateIcon();
             this.FormBorderStyle = FormBorderStyle.Sizable;
@@ -62,48 +62,49 @@ namespace GVPN
 
         private void SetupButtons()
         {
-            Panel buttonPanel = new Panel();
-            buttonPanel.Dock = DockStyle.Bottom;
-            buttonPanel.Height = 70;
-            buttonPanel.Padding = new Padding(10);
+            Panel footerPanel = new Panel();
+            footerPanel.Dock = DockStyle.Bottom;
+            footerPanel.AutoSize = true;
+            footerPanel.Padding = new Padding(10);
 
             statusLabel = new Label();
-            statusLabel.Dock = DockStyle.Top;
             statusLabel.Text = "Loading servers...";
-            statusLabel.Height = 20;
-            statusLabel.Padding = new Padding(5, 0, 0, 0);
-            buttonPanel.Controls.Add(statusLabel);
+            statusLabel.AutoSize = true;
+            statusLabel.Dock = DockStyle.Top;
+            footerPanel.Controls.Add(statusLabel);
 
-            Panel buttons = new Panel();
-            buttons.Dock = DockStyle.Fill;
-            buttons.Padding = new Padding(0, 5, 0, 0);
+            FlowLayoutPanel buttonPanel = new FlowLayoutPanel();
+            buttonPanel.Dock = DockStyle.Top;
+            buttonPanel.AutoSize = true;
+            buttonPanel.WrapContents = false;
+            buttonPanel.Padding = new Padding(5);
 
             autoConnectButton = new Button();
             autoConnectButton.Text = "Auto-Connect (Closest)";
             autoConnectButton.Width = 150;
             autoConnectButton.Height = 30;
-            autoConnectButton.Location = new Point(10, 5);
+            autoConnectButton.Margin = new Padding(5);
             autoConnectButton.Click += AutoConnect_Click;
-            buttons.Controls.Add(autoConnectButton);
+            buttonPanel.Controls.Add(autoConnectButton);
 
             connectButton = new Button();
             connectButton.Text = "Connect Selected";
             connectButton.Width = 120;
             connectButton.Height = 30;
-            connectButton.Location = new Point(170, 5);
+            connectButton.Margin = new Padding(5);
             connectButton.Click += Connect_Click;
-            buttons.Controls.Add(connectButton);
+            buttonPanel.Controls.Add(connectButton);
 
             closeButton = new Button();
             closeButton.Text = "Close";
             closeButton.Width = 100;
             closeButton.Height = 30;
-            closeButton.Location = new Point(300, 5);
+            closeButton.Margin = new Padding(5);
             closeButton.Click += (s, e) => this.Close();
-            buttons.Controls.Add(closeButton);
+            buttonPanel.Controls.Add(closeButton);
 
-            buttonPanel.Controls.Add(buttons);
-            this.Controls.Add(buttonPanel);
+            footerPanel.Controls.Add(buttonPanel);
+            this.Controls.Add(footerPanel);
         }
 
         private void LoadVpnServers()
