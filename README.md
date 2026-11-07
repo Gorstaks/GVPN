@@ -1,71 +1,43 @@
-# GVpnCSharp - VPN Manager with Tray Icon
+# GVPN - VPN Manager with Tray Icon
 
 A minimal C# 4.8 / .NET Framework Windows Forms application that provides VPN management with a system tray icon and kill switch functionality.
 
 ## Features
 
 - **System Tray Icon** - Minimalist UI that lives in the taskbar
+- **Auto-setup** - Automatically creates VPN connection on first run
 - **Auto-reconnect** - Automatically fetches the closest VPN server and maintains connection
-- **Kill Switch** - Blocks ALL traffic if VPN disconnects (firewall-based, requires admin)
+- **Kill Switch** - Blocks ALL traffic if VPN disconnects (firewall-based)
 - **Status Monitoring** - Real-time VPN status indicator (green = connected, red = disconnected)
 - **Manual Connect/Disconnect** - One-click VPN operations
 - **Logging** - Detailed logs saved to `vpn.log`
-- **Lightweight** - Compiles to a single tiny executable with no external dependencies (uses System assemblies)
+- **Lightweight** - Single 30 KB executable with no external dependencies
 
 ## Requirements
 
 - Windows 7 or later
 - .NET Framework 4.8
-- Visual Studio or Windows SDK (for csc.exe compiler)
-- VPN connection named "MyVPN" configured in Windows RAS (Remote Access Service)
 
-## Setup
+## Installation & Usage
 
-### 1. Create VPN Connection
-
-Before running the application, you need to set up a VPN connection in Windows:
+**Just run GVPN.exe - that's it!**
 
 ```powershell
-# Open Settings > Network & Internet > VPN > Add a VPN connection
-# Or use this command to create a RAS connection (modify as needed)
+GVPN.exe
 ```
 
-Or manually create via Settings:
-1. Open Settings
-2. Go to Network & Internet > VPN
-3. Click "Add a VPN connection"
-4. Fill in your VPN details
-5. Name it "MyVPN" (the app looks for this name)
+**First run:**
+- Right-click PowerShell.exe → "Run as Administrator"
+- Run GVPN.exe from the admin shell
+- GVPN automatically creates the "MyVPN" L2TP/IPSec VPN connection
+- Takes ~2-3 seconds on first launch
+- After that, no admin needed
 
-### 2. Build the Project
-
-```powershell
-# Navigate to the project directory
-cd E:\Gorstak\GVpnCSharp
-
-# Run the build script
-.\build.ps1
-```
-
-Or compile manually with csc:
-
-```powershell
-csc /target:winexe /out:bin\Release\GVpn.exe `
-  /reference:System.dll /reference:System.Windows.Forms.dll /reference:System.Drawing.dll `
-  Program.cs VpnTrayApplication.cs VpnManager.cs Logger.cs
-```
-
-### 3. Run the Application
-
-```powershell
-.\bin\Release\GVpn.exe
-```
-
-The application will:
-- Hide in the system tray
-- Automatically attempt to fetch the closest VPN server
-- Monitor connection every 30 seconds
-- Auto-reconnect if disconnected
+**After setup:**
+- GVPN minimizes to system tray
+- Automatically connects to the closest VPN Gate server
+- Monitors connection every 30 seconds
+- Auto-reconnects to a different server if disconnected
 
 ## Usage
 
@@ -90,8 +62,8 @@ Edit these constants in `VpnManager.cs` if needed:
 
 ```csharp
 private const string VpnName = "MyVPN";      // Name of VPN connection
-private const string VpnUser = "vpn";        // VPN username
-private const string VpnPass = "vpn";        // VPN password
+private const string VpnUser = "vpn";        // VPN username (hardcoded for VPNGate)
+private const string VpnPass = "vpn";        // VPN password (hardcoded for VPNGate)
 ```
 
 ## VPN Servers
@@ -99,23 +71,41 @@ private const string VpnPass = "vpn";        // VPN password
 The application fetches public VPN servers from:
 - **Source**: https://www.vpngate.net/api/iphone/
 - **Selection**: Automatically selects the server with the lowest ping (closest to you)
+- **Credentials**: Always vpn / vpn (VPNGate public credentials)
 
 ## Logs
 
 Application logs are saved to `vpn.log` in the working directory with entries like:
 
 ```
-2026-11-06 14:23:45 - Application started
-2026-11-06 14:23:46 - Selected VPN: 1.2.3.4 (US, ping: 45ms)
-2026-11-06 14:23:50 - VPN connected to 1.2.3.4
+2026-11-07 14:23:45 - Application started
+2026-11-07 14:23:46 - Checking if MyVPN connection exists...
+2026-11-07 14:23:47 - MyVPN connection created successfully
+2026-11-07 14:23:50 - Selected VPN: 158.217.184.31 (JP, ping: 1ms)
+2026-11-07 14:23:52 - Connected to 158.217.184.31
 ```
 
 ## Architecture
 
 - **Program.cs** - Entry point, creates main form
 - **VpnTrayApplication.cs** - Main form with tray icon UI and monitoring loop
-- **VpnManager.cs** - Handles all VPN operations (connect, disconnect, status, fetch servers)
+- **VpnManager.cs** - Handles all VPN operations (create, connect, disconnect, status, fetch servers)
 - **Logger.cs** - Thread-safe logging utility
+
+## Build
+
+```powershell
+cd E:\Gorstak\GVPN
+.\build.ps1
+```
+
+Or compile manually with csc:
+
+```powershell
+csc /target:winexe /out:bin\Release\GVPN.exe `
+  /reference:System.dll /reference:System.Windows.Forms.dll /reference:System.Drawing.dll `
+  Program.cs VpnTrayApplication.cs VpnManager.cs Logger.cs
+```
 
 ## Compilation Details
 
@@ -127,10 +117,10 @@ Application logs are saved to `vpn.log` in the working directory with entries li
 
 ## Known Limitations
 
-- Requires a pre-configured RAS VPN connection named "MyVPN"
 - Windows only (uses `rasdial.exe` for VPN operations)
-- Kill switch just disconnects and exits; doesn't block all traffic permanently
-- VPN credentials hardcoded in source (for trusted environments only)
+- Kill switch blocks outbound traffic when failover fails; doesn't create persistent blocks
+- VPN credentials hardcoded (VPNGate always uses vpn/vpn)
+- Requires first run as Administrator (to create VPN connection)
 
 ## Legal Disclaimer
 
@@ -198,22 +188,44 @@ If you do not agree with any of these terms, **do not use this software**.
 
 ## Troubleshooting
 
-### "csc.exe not found"
-Install Visual Studio or Windows SDK. The build script searches common installation paths.
+### "Connection attempt timed out" in logs
+This means:
+- GVPN created MyVPN correctly ✓
+- It's trying to connect to a VPNGate server
+- But the connection timed out after 10 seconds
 
-### VPN connection fails
-- Ensure "MyVPN" is created in Windows RAS settings
-- Check credentials in `VpnManager.cs`
-- Review `vpn.log` for detailed error messages
+**Causes:**
+- Network can't reach VPNGate servers (firewall, ISP, region blocking)
+- ISP blocks L2TP protocol
+- All 5 selected servers are unreachable or rejecting connections
+- VPNGate service is down in your region
+
+**Solutions:**
+- Try running GVPN again (different servers might be available)
+- Check if you can access https://www.vpngate.net in your browser
+- Check with your ISP if they allow L2TP/IPSec VPN protocols
+- If blocked, you may need a different VPN protocol or service
+- Try disabling any antivirus/firewall temporarily
+
+### "MyVPN connection NOT FOUND" in logs
+- Make sure you ran GVPN.exe as Administrator on first launch
+- Right-click PowerShell.exe → "Run as Administrator"
+- Then run GVPN.exe again
 
 ### Application won't start
-- Right-click properties on GVpn.exe → Compatibility → Run as Administrator
-- Check Windows Event Viewer for application errors
+- Verify .NET Framework 4.8 is installed
+- Try running from Command Prompt to see error messages
+- Check Windows Event Viewer for errors
 
 ### VPN server fetch fails
-- Verify internet connection
-- Check firewall rules allow access to vpngate.net
-- VPN Gate may be blocked in your region; use a different VPN first
+- Verify internet connection (GVPN needs internet to fetch server list)
+- Try accessing https://www.vpngate.net in your browser
+- VPN Gate may be blocked in your region
+
+### Kill switch not working
+- Ensure you have administrator privileges
+- Check Windows Firewall is enabled
+- Review `vpn.log` for netsh errors
 
 ## License
 

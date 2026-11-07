@@ -37,6 +37,12 @@ namespace GVPN
             // Setup tray icon
             SetupTrayIcon();
 
+            logger.Log("Application started");
+            
+            // Ensure VPN connection exists (auto-create if needed)
+            logger.Log("Checking and auto-creating VPN connection if needed...");
+            vpnManager.EnsureVpnConnectionExists();
+
             // Start monitoring
             isRunning = true;
             vpnMonitorThread = new Thread(VpnMonitorLoop)
@@ -46,7 +52,8 @@ namespace GVPN
             };
             vpnMonitorThread.Start();
 
-            logger.Log("Application started");
+            // Log VPN diagnostics
+            vpnManager.LogDiagnostics();
         }
 
         private void SetupTrayIcon()

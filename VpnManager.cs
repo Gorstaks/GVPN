@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Text;
 using System.Collections.Generic;
+using System.IO;
 
 namespace GVPN
 {
@@ -25,6 +26,177 @@ namespace GVPN
         public VpnManager(Logger logger)
         {
             this.logger = logger;
+        }
+
+        public void EnsureVpnConnectionExists()
+        {
+            try
+            {
+                logger.Log("Checking if MyVPN connection exists...");
+                
+                // Check if connection exists
+                if (VpnConnectionExists())
+                {
+                    logger.Log("MyVPN connection is ready");
+                    return;
+                }
+
+                logger.Log("MyVPN not found - creating it now...");
+                CreateVpnConnection();
+                
+                // Verify it was created
+                if (VpnConnectionExists())
+                {
+                    logger.Log("MyVPN connection created successfully");
+                }
+                else
+                {
+                    logger.Log("WARNING: MyVPN creation may have failed - attempting to continue");
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Log("Error in VPN setup: " + ex.Message);
+            }
+        }
+
+        private bool VpnConnectionExists()
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "powershell.exe",
+                    Arguments = "-NoProfile -ExecutionPolicy Bypass -Command \"Get-VpnConnection -Name 'MyVPN' -ErrorAction SilentlyContinue | Where-Object {$_.Name -eq 'MyVPN'} | Select-Object -ExpandProperty Name\"",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+
+                using (var process = Process.Start(psi))
+                {
+                    if (!process.WaitForExit(5000))
+                    {
+                        process.Kill();
+                        return false;
+                    }
+                    
+                    string output = process.StandardOutput.ReadToEnd().Trim();
+                    return output.Contains("MyVPN");
+                }
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void CreateVpnConnection()
+        {
+            try
+            {
+                // Build the PowerShell command to create VPN connection
+                string psCommand = 
+                    "$ErrorActionPreference = 'Stop'; " +
+                    "Remove-VpnConnection -Name 'MyVPN' -Force -ErrorAction SilentlyContinue | Out-Null; " +
+                    "Start-Sleep -Milliseconds 500; " +
+                    "Add-VpnConnection -Name 'MyVPN' " +
+                    "  -ServerAddress '0.0.0.0' " +
+                    "  -TunnelType L2tp " +
+                    "  -EncryptionLevel Required " +
+                    "  -AuthenticationMethod MSChapv2 " +
+                    "  -L2tpPsk 'vpn' " +
+                    "  -Force -WarningAction SilentlyContinue | Out-Null; " +
+                    "Write-Host 'Created'; " +
+                    "Get-VpnConnection -Name 'MyVPN' | Select-Object -ExpandProperty Name";
+
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "powershell.exe",
+                    Arguments = "-NoProfile -ExecutionPolicy Bypass -Command \"" + psCommand + "\"",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+
+                using (var process = Process.Start(psi))
+                {
+                    if (!process.WaitForExit(15000))
+                    {
+                        process.Kill();
+                        logger.Log("VPN creation timed out");
+                        return;
+                    }
+
+                    string output = process.StandardOutput.ReadToEnd();
+                    string error = process.StandardError.ReadToEnd();
+
+                    if (!string.IsNullOrEmpty(output))
+                    {
+                        logger.Log("VPN creation output: " + output.Trim());
+                    }
+
+                    if (!string.IsNullOrEmpty(error) && !error.Contains("deprecated"))
+                    {
+                        logger.Log("VPN creation notice: " + error.Trim());
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Log("VPN creation error: " + ex.Message);
+            }
+        }
+
+
+        private void ExecutePowerShell(string command, int timeoutMs)
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "powershell.exe",
+                    Arguments = "-NoProfile -ExecutionPolicy Bypass -Command \"" + command + "\"",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+
+                using (var process = Process.Start(psi))
+                {
+                    if (!process.WaitForExit(timeoutMs))
+                    {
+                        process.Kill();
+                        logger.Log("PowerShell command timed out");
+                        return;
+                    }
+
+                    string output = process.StandardOutput.ReadToEnd();
+                    string error = process.StandardError.ReadToEnd();
+
+                    if (!string.IsNullOrEmpty(output))
+                    {
+                        logger.Log("PowerShell output: " + output.Trim());
+                    }
+
+                    if (!string.IsNullOrEmpty(error))
+                    {
+                        logger.Log("PowerShell error: " + error.Trim());
+                    }
+
+                    if (process.ExitCode != 0)
+                    {
+                        logger.Log("PowerShell exit code: " + process.ExitCode);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Log("PowerShell execution error: " + ex.Message);
+            }
         }
 
         public Tuple<string, string> GetPublicVpn()
@@ -94,10 +266,19 @@ namespace GVPN
             {
                 logger.Log("Connecting to VPN: " + host);
 
+                // Update the MyVPN connection with the new server address
+                string updateCmd = 
+                    "$ErrorActionPreference = 'SilentlyContinue'; " +
+                    "Set-VpnConnection -Name 'MyVPN' -ServerAddress '" + host + "' -Force -ErrorAction SilentlyContinue | Out-Null; " +
+                    "Write-Host 'Updated'";
+
+                ExecutePowerShell(updateCmd, 5000);
+
+                // Connect using rasdial with the connection name
                 var psi = new ProcessStartInfo
                 {
                     FileName = "rasdial",
-                    Arguments = "\"" + VpnName + "\" " + host + " " + VpnUser + " " + VpnPass,
+                    Arguments = "MyVPN " + VpnUser + " " + VpnPass,
                     UseShellExecute = false,
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
@@ -106,29 +287,80 @@ namespace GVPN
 
                 using (var process = Process.Start(psi))
                 {
-                    // Reduced timeout from 10s to 5s for faster failover
-                    if (!process.WaitForExit(5000))
+                    // Increase timeout to 10s to allow connection to establish
+                    if (!process.WaitForExit(10000))
                     {
                         process.Kill();
-                        logger.Log("Connection attempt timed out after 5s");
+                        logger.Log("Connection attempt timed out after 10s");
                         return false;
                     }
+
+                    string output = process.StandardOutput.ReadToEnd();
+                    string error = process.StandardError.ReadToEnd();
 
                     if (process.ExitCode != 0)
                     {
-                        string error = process.StandardError.ReadToEnd();
-                        logger.Log("Connection failed (exit " + process.ExitCode + "): " + error);
+                        logger.Log("Connection failed (exit " + process.ExitCode + "): " + error.Substring(0, Math.Min(error.Length, 100)));
                         return false;
                     }
 
-                    logger.Log("Connected to " + host);
-                    return true;
+                    // Check if connection was successful
+                    if (output.Contains("Connected") || process.ExitCode == 0)
+                    {
+                        logger.Log("Connected to " + host);
+                        
+                        // Flush DNS cache on successful connection
+                        logger.Log("Flushing DNS cache...");
+                        FlushDnsCache();
+                        
+                        return true;
+                    }
+                    else
+                    {
+                        logger.Log("Connection status unclear: " + output.Substring(0, Math.Min(output.Length, 100)));
+                        return false;
+                    }
                 }
             }
             catch (Exception ex)
             {
                 logger.Log("Connection error: " + ex.Message);
                 return false;
+            }
+        }
+
+        private void FlushDnsCache()
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = "/c ipconfig /flushdns",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true
+                };
+
+                using (var process = Process.Start(psi))
+                {
+                    process.WaitForExit(3000);
+                    string output = process.StandardOutput.ReadToEnd();
+                    
+                    if (process.ExitCode == 0)
+                    {
+                        logger.Log("DNS cache flushed successfully");
+                    }
+                    else
+                    {
+                        logger.Log("DNS flush may have failed (exit " + process.ExitCode + ")");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.Log("DNS flush error: " + ex.Message);
             }
         }
 
@@ -167,8 +399,21 @@ namespace GVPN
 
                 if (ConnectVpn(server.Host))
                 {
-                    logger.Log("Successfully connected on attempt " + attempts);
-                    return true;
+                    // Give connection time to stabilize before returning
+                    logger.Log("Connected - waiting 3 seconds for stabilization...");
+                    System.Threading.Thread.Sleep(3000);
+                    
+                    // Verify connection is still active
+                    if (CheckVpnStatus())
+                    {
+                        logger.Log("Connection verified - still active after 3 seconds");
+                        logger.Log("Successfully connected on attempt " + attempts);
+                        return true;
+                    }
+                    else
+                    {
+                        logger.Log("Connection dropped during stabilization - trying next server");
+                    }
                 }
 
                 logger.Log("Failed to connect to " + server.Host + ", trying next server...");
@@ -235,7 +480,16 @@ namespace GVPN
                 {
                     string output = process.StandardOutput.ReadToEnd();
                     bool isConnected = output.Contains("Connected");
-                    logger.Log("VPN status: " + (isConnected ? "Connected" : "Disconnected"));
+                    
+                    if (isConnected)
+                    {
+                        logger.Log("VPN status: Connected (verified via rasdial)");
+                    }
+                    else
+                    {
+                        logger.Log("VPN status: Disconnected (rasdial shows no active connections)");
+                    }
+                    
                     return isConnected;
                 }
             }
@@ -389,6 +643,42 @@ namespace GVPN
             {
                 logger.Log("Execute command error: " + ex.Message);
                 return false;
+            }
+        }
+
+        public void LogDiagnostics()
+        {
+            try
+            {
+                logger.Log("=== VPN DIAGNOSTICS ===");
+                
+                // Check rasdial status
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "rasdial",
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    CreateNoWindow = true
+                };
+
+                using (var process = Process.Start(psi))
+                {
+                    string output = process.StandardOutput.ReadToEnd();
+                    string[] lines = output.Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+                    foreach (string line in lines)
+                    {
+                        if (!string.IsNullOrWhiteSpace(line))
+                        {
+                            logger.Log("RASDIAL: " + line);
+                        }
+                    }
+                }
+
+                logger.Log("=== END DIAGNOSTICS ===");
+            }
+            catch (Exception ex)
+            {
+                logger.Log("Diagnostics error: " + ex.Message);
             }
         }
     }
