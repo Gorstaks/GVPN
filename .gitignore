@@ -32,3 +32,9 @@ Thumbs.db
 *.tmp
 *.temp
 *.bak
+
+# Bundled OpenVPN client + TAP driver ship with every release; keep them tracked
+# despite the bin/ *.exe *.dll rules above.
+!thirdparty/openvpn/bin/
+!thirdparty/openvpn/**/*.exe
+!thirdparty/openvpn/**/*.dll

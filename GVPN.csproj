@@ -11,6 +11,7 @@
     <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <TargetFrameworkProfile />
+    <ApplicationManifest>app.manifest</ApplicationManifest>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <PlatformTarget>AnyCPU</PlatformTarget>
@@ -50,6 +51,11 @@
     <Compile Include="VpnListForm.cs" />
     <Compile Include="VpnManager.cs" />
     <Compile Include="Logger.cs" />
+    <Compile Include="ConfigSanitizer.cs" />
+    <Compile Include="KillSwitch.cs" />
+    <Compile Include="SelfSetup.cs" />
+    <Compile Include="BundledOpenVpn.cs" />
+    <Compile Include="AssemblyInfo.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

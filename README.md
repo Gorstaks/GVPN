@@ -2,6 +2,18 @@
 
 A minimal C# 4.8 / .NET Framework Windows Forms application that provides VPN management with a system tray icon and kill switch functionality.
 
+## 0.0.4 (current)
+
+GVPN now connects through the bundled OpenVPN 2.7.9 client to public VPNGate servers. Older sections below that mention L2TP/IPSec, `rasdial` or "MyVPN" describe 0.0.3 and earlier.
+
+- **Run:** download `GVPN.exe` (single file, ~7 MB) and start it. It asks for administrator rights: OpenVPN needs them to set up the adapter and routes.
+- **First run:** unpacks the embedded OpenVPN client and TAP-Windows6 driver to `C:\Program Files\GVPN\openvpn` (admin-only folder; files are re-checked against the embedded copy on every start), installs the driver, creates the "GVPN TAP" adapter, and registers an elevated sign-in task "GVPN" so it starts automatically afterwards.
+- **Servers:** reads the VPNGate list and each server's own OpenVPN config. Configs are rebuilt from an allowlist, so a hostile volunteer server cannot run scripts or plugins.
+- **Kill switch:** one Windows Firewall rule blocks traffic on physical adapters except to the current VPN server. It stays on through crashes and restarts; tray Exit turns it off.
+- **Logs:** `%APPDATA%\Sentinel\GVPN\vpn.log` (tray > View Logs).
+- **Remove:** `GVPN.exe --uninstall` (as administrator) removes the kill switch rule, the sign-in task, the adapter and `C:\Program Files\GVPN`, then delete GVPN.exe.
+- **Build:** `.\build.ps1` (dev) or `.\build.ps1 -Release` (creates `releases\<version>\`; version from `AssemblyInfo.cs`).
+
 ## Features
 
 - **System Tray Icon** - Minimalist UI that lives in the taskbar

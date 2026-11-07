@@ -51,10 +51,10 @@ namespace GVPN
             gridView.BackgroundColor = SystemColors.Window;
             gridView.AlternatingRowsDefaultCellStyle.BackColor = Color.WhiteSmoke;
 
-            gridView.Columns.Add("IP", "VPN Server IP");
+            gridView.Columns.Add("IP", "Server");
             gridView.Columns.Add("Country", "Country");
             gridView.Columns.Add("Ping", "Ping (ms)");
-            gridView.Columns.Add("Speed", "Speed (bps)");
+            gridView.Columns.Add("Speed", "Speed (Mbps)");
             gridView.Columns.Add("Sessions", "Sessions");
 
             this.Controls.Add(gridView);
@@ -80,7 +80,7 @@ namespace GVPN
             buttonPanel.Padding = new Padding(5);
 
             autoConnectButton = new Button();
-            autoConnectButton.Text = "Auto-Connect (Closest)";
+            autoConnectButton.Text = "Connect Best";
             autoConnectButton.Width = 150;
             autoConnectButton.Height = 30;
             autoConnectButton.Margin = new Padding(5);
@@ -141,95 +141,74 @@ namespace GVPN
         private void PopulateGrid()
         {
             gridView.Rows.Clear();
-
             foreach (VpnServer server in vpnServers)
             {
                 gridView.Rows.Add(
-                    server.Host,
-                    server.Country,
-                    server.Ping,
-                    FormatSpeed(server.Speed),
-                    server.Sessions
-                );
+                    server.IP + " (" + server.Protocol + "/" + server.Port + ")",
+                    server.CountryLong,
+                    server.Ping >= 9999 ? "?" : server.Ping.ToString(),
+                    (server.Speed / 1000000.0).ToString("0.0"),
+                    server.Sessions);
             }
-        }
-
-        private string FormatSpeed(long speed)
-        {
-            if (speed >= 1000000000)
-                return (speed / 1000000000) + " Gbps";
-            if (speed >= 1000000)
-                return (speed / 1000000) + " Mbps";
-            if (speed >= 1000)
-                return (speed / 1000) + " Kbps";
-            return speed + " bps";
         }
 
         private void AutoConnect_Click(object sender, EventArgs e)
         {
             if (vpnServers.Count == 0)
             {
-                MessageBox.Show("No servers available.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show("No servers available.", "GVPN", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
-
-            VpnServer closest = null;
-            int lowestPing = int.MaxValue;
-            foreach (VpnServer server in vpnServers)
-            {
-                if (server.Ping < lowestPing)
-                {
-                    lowestPing = server.Ping;
-                    closest = server;
-                }
-            }
-
-            if (closest != null)
-            {
-                statusLabel.Text = "Connecting to " + closest.Host + " (" + closest.Country + ")...";
-                statusLabel.Refresh();
-
-                if (vpnManager.ConnectVpn(closest.Host))
-                {
-                    MessageBox.Show("Connected to " + closest.Host + " (" + closest.Country + ")", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    this.Close();
-                }
-                else
-                {
-                    statusLabel.Text = "Connection failed. See logs for details.";
-                    MessageBox.Show("Failed to connect. Check vpn.log for details.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-            }
+            // vpnServers is already ordered by ping, then VPNGate score.
+            ConnectInBackground(vpnServers[0]);
         }
 
         private void Connect_Click(object sender, EventArgs e)
         {
             if (gridView.SelectedRows.Count == 0)
             {
-                MessageBox.Show("Please select a VPN server.", "Selection Required", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                MessageBox.Show("Please select a VPN server.", "GVPN", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 return;
             }
-
-            int selectedIndex = gridView.SelectedRows[0].Index;
-            if (selectedIndex >= 0 && selectedIndex < vpnServers.Count)
-            {
-                VpnServer selected = vpnServers[selectedIndex];
-                statusLabel.Text = "Connecting to " + selected.Host + " (" + selected.Country + ")...";
-                statusLabel.Refresh();
-
-                if (vpnManager.ConnectVpn(selected.Host))
-                {
-                    MessageBox.Show("Connected to " + selected.Host + " (" + selected.Country + ")", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                    this.Close();
-                }
-                else
-                {
-                    statusLabel.Text = "Connection failed. See logs for details.";
-                    MessageBox.Show("Failed to connect. Check vpn.log for details.", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                }
-            }
+            int index = gridView.SelectedRows[0].Index;
+            if (index >= 0 && index < vpnServers.Count)
+                ConnectInBackground(vpnServers[index]);
         }
 
+        /// <summary>Connecting can take up to 30 s; keep the window responsive meanwhile.</summary>
+        private void ConnectInBackground(VpnServer server)
+        {
+            SetButtonsEnabled(false);
+            statusLabel.Text = "Connecting to " + server.IP + " (" + server.CountryLong + ")...";
+
+            var worker = new System.Threading.Thread(() =>
+            {
+                bool ok = vpnManager.ConnectVpn(server);
+                if (IsDisposed) return;
+                BeginInvoke((MethodInvoker)delegate
+                {
+                    SetButtonsEnabled(true);
+                    if (ok)
+                    {
+                        MessageBox.Show("Connected to " + server.IP + " (" + server.CountryLong + ")", "GVPN", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                        Close();
+                    }
+                    else
+                    {
+                        statusLabel.Text = "Connection failed. Try another server or see View Logs.";
+                    }
+                });
+            });
+            worker.IsBackground = true;
+            worker.Start();
+        }
+
+        private void SetButtonsEnabled(bool enabled)
+        {
+            connectButton.Enabled = enabled;
+            autoConnectButton.Enabled = enabled;
+            gridView.Enabled = enabled;
+        }
         private System.Drawing.Icon CreateIcon()
         {
             using (var bitmap = new Bitmap(16, 16))
